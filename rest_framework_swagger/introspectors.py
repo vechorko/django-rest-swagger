@@ -215,16 +215,7 @@ class BaseMethodIntrospector(object):
             mock_view = parser.get_view_mocker(self.callback)
             view = mock_view(view)
             if view is not None:
-                if parser.should_omit_serializer():
-                    return None
-                try:
-                    serializer_class = view.get_serializer_class()
-                except AssertionError as e:
-                    if "should either include a `serializer_class` attribute, or override the `get_serializer_class()` method." in str(e):  # noqa
-                        serializer_class = None
-                    else:
-                        raise
-                return serializer_class
+                return view.get_serializer_class()
 
     def create_view(self):
         view = self.callback()
@@ -259,10 +250,14 @@ class BaseMethodIntrospector(object):
         return serializer
 
     def get_summary(self):
-        # If there is no docstring on the method, get class docs
+        # If there is no docstring on the method, get summary 
+	# from YAML in class docs, else get class docs
         return IntrospectorHelper.get_summary(
             self.callback,
-            self.get_docs() or self.parent.get_description())
+            self.get_docs() or
+            self.get_yaml_parser().get_summary() or
+            self.parent.get_description()
+        )
 
     def get_nickname(self):
         """ Returns the APIView's nickname """
@@ -272,15 +267,16 @@ class BaseMethodIntrospector(object):
     def get_notes(self):
         """
         Returns the body of the docstring trimmed before any parameters are
-        listed. First, get the class docstring and then get the method's. The
-        methods will always inherit the class comments.
+        listed. First, get the class docstring then get the notes from yaml 
+	in class docstring and then get the method's. The methods will always 
+	inherit the class comments.
         """
         docstring = ""
 
         class_docs = get_view_description(self.callback)
         class_docs = IntrospectorHelper.strip_yaml_from_docstring(class_docs)
         class_docs = IntrospectorHelper.strip_params_from_docstring(class_docs)
-        method_docs = self.get_docs()
+        method_docs = self.get_docs() or self.get_yaml_parser().get_notes()
 
         if class_docs is not None:
             docstring += class_docs + "  \n"
@@ -520,13 +516,8 @@ def get_data_type(field):
         # return 'string', 'string' # 'file upload'
     # elif isinstance(field, fields.CharField):
         # return 'string', 'string'
-    elif rest_framework.VERSION >= '3.0.0':
-        if isinstance(field, fields.HiddenField):
-            return 'hidden', 'hidden'
-        elif isinstance(field, fields.ListField):
-            return 'array', 'array'
-        else:
-            return 'string', 'string'
+    elif rest_framework.VERSION >= '3.0.0' and isinstance(field, fields.HiddenField):
+        return 'hidden', 'hidden'
     else:
         return 'string', 'string'
 
@@ -958,6 +949,18 @@ class YAMLDocstringParser(object):
                 raise Exception("Could not find %s, looked in %s" % (cls_path, module))
 
         return class_obj
+
+    def get_summary(self):
+        """
+	Retrives summary from YAML object
+	"""
+	return self.object.get('summary', None)
+
+    def get_notes(self):
+        """
+	Retrives notes from YAML object
+	"""
+	return self.object.get('notes', None)
 
     def get_serializer_class(self, callback):
         """
