@@ -7,17 +7,15 @@ import itertools
 import re
 import yaml
 import importlib
-
 from .compat import OrderedDict, strip_tags, get_pagination_attribures
 from abc import ABCMeta, abstractmethod
-
 from django.http import HttpRequest
 from django.contrib.admindocs.utils import trim_docstring
 from django.utils.encoding import smart_text
-
 import rest_framework
 from rest_framework import viewsets
 from rest_framework.compat import apply_markdown
+
 try:
     from rest_framework.fields import CurrentUserDefault
 except ImportError:
@@ -25,6 +23,7 @@ except ImportError:
     CurrentUserDefault = None
 from rest_framework.utils import formatting
 from django.utils import six
+
 try:
     import django_filters
 except ImportError:
@@ -132,8 +131,10 @@ class IntrospectorHelper(object):
 class BaseViewIntrospector(object):
     __metaclass__ = ABCMeta
 
-    def __init__(self, callback, path, pattern, user):
+    def __init__(self, docgenerator, callback, path, pattern, user):
+        self.docgenerator = docgenerator
         self.callback = callback
+        self.parent_callback = None
         self.path = path
         self.pattern = pattern
         self.user = user
@@ -149,11 +150,20 @@ class BaseViewIntrospector(object):
     def get_iterator(self):
         return self.__iter__()
 
+    def get_module(self):
+        return self.callback.__module__
+
     def get_description(self):
         """
         Returns the first sentence of the first line of the class docstring
         """
         return IntrospectorHelper.get_summary(self.callback)
+
+    def get_inherited_docs(self, parent_callback):
+        """
+        Returns docs from parent view
+        """
+        return get_view_description(parent_callback)
 
     def get_docs(self):
         return get_view_description(self.callback)
@@ -178,8 +188,9 @@ class BaseMethodIntrospector(object):
         self.method = method
         self.parent = view_introspector
         self.callback = view_introspector.callback
-        self.path = view_introspector.path
         self.user = view_introspector.user
+        self.path = view_introspector.path
+        self.parser = self.get_yaml_parser()
 
     def get_module(self):
         return self.callback.__module__
@@ -187,7 +198,7 @@ class BaseMethodIntrospector(object):
     def check_yaml_methods(self, yaml_methods):
         missing_set = set()
         for key in yaml_methods:
-            if key not in self.parent.methods():
+            if key not in self.parent.methods() + ['inherit_docs_from', ]:
                 missing_set.add(key)
         if missing_set:
             raise Exception(
@@ -197,21 +208,23 @@ class BaseMethodIntrospector(object):
     def get_yaml_parser(self):
         parser = YAMLDocstringParser(self)
         parent_parser = YAMLDocstringParser(self.parent)
+        self.parent.get_inherited_docs(parent_parser.object.get('inherit_docs_from', None))
         self.check_yaml_methods(parent_parser.object.keys())
         new_object = {}
         new_object.update(parent_parser.object.get(self.method, {}))
         new_object.update(parser.object)
-        parser.object = new_object
+
+        parser.object.update(new_object)
         return parser
 
     def get_extra_serializer_classes(self):
-        return self.get_yaml_parser().get_extra_serializer_classes(
+        return self.parser.get_extra_serializer_classes(
             self.callback)
 
     def ask_for_serializer_class(self):
         if hasattr(self.callback, 'get_serializer_class'):
             view = self.create_view()
-            parser = self.get_yaml_parser()
+            parser = self.parser
             mock_view = parser.get_view_mocker(self.callback)
             view = mock_view(view)
             if view is not None:
@@ -229,33 +242,32 @@ class BaseMethodIntrospector(object):
         return view
 
     def get_serializer_class(self):
-        parser = self.get_yaml_parser()
+        parser = self.parser
         serializer = parser.get_serializer_class(self.callback)
         if serializer is None:
             serializer = self.ask_for_serializer_class()
         return serializer
 
     def get_response_serializer_class(self):
-        parser = self.get_yaml_parser()
+        parser = self.parser
         serializer = parser.get_response_serializer_class(self.callback)
         if serializer is None:
             serializer = self.get_serializer_class()
         return serializer
 
     def get_request_serializer_class(self):
-        parser = self.get_yaml_parser()
+        parser = self.parser
         serializer = parser.get_request_serializer_class(self.callback)
         if serializer is None:
             serializer = self.get_serializer_class()
         return serializer
 
     def get_summary(self):
-        # If there is no docstring on the method, get summary 
-	# from YAML in class docs, else get class docs
+        # If there is no docstring on the method, get class docs
         return IntrospectorHelper.get_summary(
             self.callback,
             self.get_docs() or
-            self.get_yaml_parser().get_summary() or
+            self.parser.get_summary() or
             self.parent.get_description()
         )
 
@@ -267,16 +279,15 @@ class BaseMethodIntrospector(object):
     def get_notes(self):
         """
         Returns the body of the docstring trimmed before any parameters are
-        listed. First, get the class docstring then get the notes from yaml 
-	in class docstring and then get the method's. The methods will always 
-	inherit the class comments.
+        listed. First, get the class docstring and then get the method's. The
+        methods will always inherit the class comments.
         """
         docstring = ""
 
         class_docs = get_view_description(self.callback)
         class_docs = IntrospectorHelper.strip_yaml_from_docstring(class_docs)
         class_docs = IntrospectorHelper.strip_params_from_docstring(class_docs)
-        method_docs = self.get_docs() or self.get_yaml_parser().get_notes()
+        method_docs = self.get_docs() or self.parser.get_notes()
 
         if class_docs is not None:
             docstring += class_docs + "  \n"
@@ -437,9 +448,9 @@ class BaseMethodIntrospector(object):
             if data_type == 'hidden':
                 continue
 
-            # guess format
-            # data_format = 'string'
-            # if data_type in self.PRIMITIVES:
+                # guess format
+                # data_format = 'string'
+                # if data_type in self.PRIMITIVES:
                 # data_format = self.PRIMITIVES.get(data_type)[0]
 
             f = {
@@ -488,33 +499,33 @@ def get_data_type(field):
         return 'boolean', 'boolean'
     elif hasattr(fields, 'NullBooleanField') and isinstance(field, fields.NullBooleanField):
         return 'boolean', 'boolean'
-    # elif isinstance(field, fields.URLField):
+        # elif isinstance(field, fields.URLField):
         # return 'string', 'string' #  'url'
-    # elif isinstance(field, fields.SlugField):
+        # elif isinstance(field, fields.SlugField):
         # return 'string', 'string', # 'slug'
     elif isinstance(field, fields.ChoiceField):
         return 'choice', 'choice'
-    # elif isinstance(field, fields.EmailField):
+        # elif isinstance(field, fields.EmailField):
         # return 'string', 'string' #  'email'
-    # elif isinstance(field, fields.RegexField):
+        # elif isinstance(field, fields.RegexField):
         # return 'string', 'string' # 'regex'
     elif isinstance(field, fields.DateField):
         return 'string', 'date'
     elif isinstance(field, fields.DateTimeField):
         return 'string', 'date-time'  # 'datetime'
-    # elif isinstance(field, fields.TimeField):
+        # elif isinstance(field, fields.TimeField):
         # return 'string', 'string' # 'time'
     elif isinstance(field, fields.IntegerField):
         return 'integer', 'int64'  # 'integer'
     elif isinstance(field, fields.FloatField):
         return 'number', 'float'  # 'float'
-    # elif isinstance(field, fields.DecimalField):
+        # elif isinstance(field, fields.DecimalField):
         # return 'string', 'string' #'decimal'
-    # elif isinstance(field, fields.ImageField):
+        # elif isinstance(field, fields.ImageField):
         # return 'string', 'string' # 'image upload'
-    # elif isinstance(field, fields.FileField):
+        # elif isinstance(field, fields.FileField):
         # return 'string', 'string' # 'file upload'
-    # elif isinstance(field, fields.CharField):
+        # elif isinstance(field, fields.CharField):
         # return 'string', 'string'
     elif rest_framework.VERSION >= '3.0.0' and isinstance(field, fields.HiddenField):
         return 'hidden', 'hidden'
@@ -592,8 +603,8 @@ class WrappedAPIViewMethodIntrospector(BaseMethodIntrospector):
 class ViewSetIntrospector(BaseViewIntrospector):
     """Handle ViewSet introspection."""
 
-    def __init__(self, callback, path, pattern, user, patterns=None):
-        super(ViewSetIntrospector, self).__init__(callback, path, pattern, user)
+    def __init__(self, docgenerator, callback, path, pattern, user, patterns=None):
+        super(ViewSetIntrospector, self).__init__(docgenerator, callback, path, pattern, user)
         if not issubclass(callback, viewsets.ViewSetMixin):
             raise Exception("wrong callback passed to ViewSetIntrospector")
         self.patterns = patterns or [pattern]
@@ -713,7 +724,7 @@ def normalize_data_format(data_type, data_format, obj):
     flatten_primitives = [
         val for sublist in BaseMethodIntrospector.PRIMITIVES.values()
         for val in sublist
-    ]
+        ]
 
     if data_format not in flatten_primitives:
         formats = BaseMethodIntrospector.PRIMITIVES.get(data_type, None)
@@ -887,6 +898,25 @@ class YAMLDocstringParser(object):
 
     def load_obj_from_docstring(self, docstring):
         """Loads YAML from docstring"""
+
+        # update one dict by other recursively
+        def recursive_update(obj, other):
+            for key, value in other.iteritems():
+                if key in obj and key != 'overwrite':
+                    # if value is dictionary we need to update it
+                    if isinstance(value, dict) and not value.get('overwrite', False):
+                        recursive_update(obj[key], other[key])
+                    # if value is a list we need to extend it
+                    elif isinstance(value, list):
+                        obj[key].extend(value)
+                    else:
+                        obj[key] = value
+                else:
+                    obj[key] = value
+
+        if not docstring:
+            return {}
+
         split_lines = trim_docstring(docstring).split('\n')
 
         # Cut YAML from rest of docstring
@@ -896,15 +926,22 @@ class YAMLDocstringParser(object):
                 cut_from = index
                 break
         else:
-            return None
+            return {}
+        yaml_string = formatting.dedent("\n".join(split_lines[cut_from:]))
 
-        yaml_string = "\n".join(split_lines[cut_from:])
-        yaml_string = formatting.dedent(yaml_string)
         try:
-            return yaml.load(yaml_string)
+            yaml_obj = yaml.load(yaml_string)
+            # if is parent view specified, we need to get docs from parent view
+            if 'inherit_docs_from' in yaml_obj:
+                parent_class = self._load_class(yaml_obj['inherit_docs_from'], self.method_introspector.callback)
+                parent_docs = self.method_introspector.get_inherited_docs(parent_class)
+                parent_obj = self.load_obj_from_docstring(docstring=parent_docs)
+                recursive_update(parent_obj, yaml_obj)
+                yaml_obj = parent_obj
         except yaml.YAMLError as e:
             self.yaml_error = e
-            return None
+            return {}
+        return yaml_obj
 
     def _load_class(self, cls_path, callback):
         """
@@ -951,16 +988,10 @@ class YAMLDocstringParser(object):
         return class_obj
 
     def get_summary(self):
-        """
-	Retrives summary from YAML object
-	"""
-	return self.object.get('summary', None)
+        return self.object.get('summary', None)
 
     def get_notes(self):
-        """
-	Retrives notes from YAML object
-	"""
-	return self.object.get('notes', None)
+        return self.object.get('notes', None)
 
     def get_serializer_class(self, callback):
         """
@@ -1206,8 +1237,10 @@ class YAMLDocstringParser(object):
         """
         Returns filter function for parameters structure
         """
+
         def filter_by(o):
             return o.get(key, None) == val
+
         return filter(filter_by, params)
 
     @staticmethod

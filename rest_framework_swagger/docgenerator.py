@@ -1,9 +1,8 @@
 """Generates API documentation by introspection."""
-import importlib
+from django.contrib.auth.models import AnonymousUser
 import rest_framework
 from rest_framework import viewsets
 from rest_framework.serializers import BaseSerializer
-from rest_framework_swagger import SWAGGER_SETTINGS
 
 from .introspectors import (
     APIViewIntrospector,
@@ -28,22 +27,13 @@ class DocumentationGenerator(object):
     explicit_response_types = dict()
 
     def __init__(self, for_user=None):
-
-        # unauthenticated user is expected to be in the form 'module.submodule.Class' if a value is present
-        unauthenticated_user = SWAGGER_SETTINGS.get('unauthenticated_user')
-
-        # attempt to load unathenticated_user class from settings if a user is not supplied
-        if not for_user and unauthenticated_user:
-            module_name, class_name = unauthenticated_user.rsplit(".", 1)
-            unauthenticated_user_class = getattr(importlib.import_module(module_name), class_name)
-            for_user = unauthenticated_user_class()
-
-        self.user = for_user
+        self.user = for_user or AnonymousUser()
 
     def generate(self, apis):
         """
         Returns documentation for a list of APIs
         """
+        self.apis = apis
         api_docs = []
         for api in apis:
             api_docs.append({
@@ -59,13 +49,13 @@ class DocumentationGenerator(object):
         pattern = api['pattern']
         callback = api['callback']
         if callback.__module__ == 'rest_framework.decorators':
-            return WrappedAPIViewIntrospector(callback, path, pattern, self.user)
+            return WrappedAPIViewIntrospector(self, callback, path, pattern, self.user)
         elif issubclass(callback, viewsets.ViewSetMixin):
             patterns = [a['pattern'] for a in apis
                         if a['callback'] == callback]
-            return ViewSetIntrospector(callback, path, pattern, self.user, patterns=patterns)
+            return ViewSetIntrospector(self, callback, path, pattern, self.user, patterns=patterns)
         else:
-            return APIViewIntrospector(callback, path, pattern, self.user)
+            return APIViewIntrospector(self, callback, path, pattern, self.user)
 
     def get_operations(self, api, apis=None):
         """
@@ -188,6 +178,7 @@ class DocumentationGenerator(object):
 
         Serializer might be ignored if explicitly told in docstring
         """
+        serializer = method_inspector.get_response_serializer_class()
         doc_parser = method_inspector.get_yaml_parser()
 
         if doc_parser.get_response_type() is not None:
@@ -195,9 +186,8 @@ class DocumentationGenerator(object):
             return None
 
         if doc_parser.should_omit_serializer():
-            return None
+            serializer = None
 
-        serializer = method_inspector.get_response_serializer_class()
         return serializer
 
     def _get_method_response_type(self, doc_parser, serializer,
