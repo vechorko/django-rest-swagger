@@ -138,7 +138,12 @@ class SwaggerResourcesView(APIDocView):
         urlparser = UrlParser()
         urlconf = getattr(self.request, "urlconf", None)
         exclude_namespaces = rfs.SWAGGER_SETTINGS.get('exclude_namespaces')
-        apis = urlparser.get_apis(urlconf=urlconf, exclude_namespaces=exclude_namespaces)
+        filter_path = '/'.join(self.request.path.strip('/').split('/')[0:2])
+        apis = urlparser.get_apis(
+            urlconf=urlconf,
+            exclude_namespaces=exclude_namespaces,
+            filter_path=filter_path,
+        )
         authorized_apis = filter(lambda a: self.handle_resource_access(self.request, a['pattern']), apis)
         authorized_apis_list = list(authorized_apis)
         resources = urlparser.get_top_level_apis(authorized_apis_list)
