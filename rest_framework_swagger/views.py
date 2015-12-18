@@ -1,6 +1,5 @@
 import json
 from django.utils import six
-
 from django.conf import settings
 from django.views.generic import View
 from django.utils.safestring import mark_safe
@@ -8,17 +7,13 @@ from django.utils.encoding import smart_text
 from django.shortcuts import render_to_response, RequestContext
 from django.core.exceptions import PermissionDenied
 from .compat import import_string
-
 from rest_framework.views import Response
 from rest_framework.settings import api_settings
 from rest_framework.utils import formatting
-
 from rest_framework_swagger.urlparser import UrlParser
 from rest_framework_swagger.apidocview import APIDocView
 from rest_framework_swagger.docgenerator import DocumentationGenerator
-
 import rest_framework_swagger as rfs
-
 
 try:
     JSONRenderer = list(filter(
@@ -105,7 +100,7 @@ class SwaggerUIView(View):
 
 
 class SwaggerResourcesView(APIDocView):
-    renderer_classes = (JSONRenderer, )
+    renderer_classes = (JSONRenderer,)
 
     def get(self, request, *args, **kwargs):
         apis = [{'path': '/' + path} for path in self.get_resources()]
@@ -151,7 +146,7 @@ class SwaggerResourcesView(APIDocView):
 
 
 class SwaggerApiView(APIDocView):
-    renderer_classes = (JSONRenderer, )
+    renderer_classes = (JSONRenderer,)
 
     def get(self, request, path, *args, **kwargs):
         apis = self.get_apis_for_resource(path)
@@ -161,8 +156,8 @@ class SwaggerApiView(APIDocView):
             'swaggerVersion': '1.2',
             'basePath': self.api_full_uri.rstrip('/'),
             'resourcePath': '/' + path,
-            'apis': generator.generate(apis),
             'models': generator.get_models(apis),
+            'apis': generator.generate(apis),
         })
 
     def get_apis_for_resource(self, filter_path):

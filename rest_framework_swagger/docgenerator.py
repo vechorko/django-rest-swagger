@@ -12,7 +12,7 @@ from .introspectors import (
     WrappedAPIViewIntrospector,
     get_data_type,
     get_default_value,
-)
+    YAMLDocstringParser)
 from .compat import OrderedDict
 
 
@@ -28,6 +28,7 @@ class DocumentationGenerator(object):
 
     def __init__(self, for_user=None):
         self.user = for_user or AnonymousUser()
+        self.view_docs_parsers = {}
 
     def generate(self, apis):
         """
@@ -72,9 +73,8 @@ class DocumentationGenerator(object):
                     method_introspector.get_http_method() == "OPTIONS":
                 continue  # No one cares. I impose JSON.
 
-            doc_parser = method_introspector.get_yaml_parser()
-
             serializer = self._get_method_serializer(method_introspector)
+            doc_parser = self.get_docs_parser(method_introspector)
 
             response_type = self._get_method_response_type(
                 doc_parser, serializer, introspector, method_introspector)
@@ -171,6 +171,13 @@ class DocumentationGenerator(object):
         models.update(self.fields_serializers)
         return models
 
+    def get_docs_parser(self, method_inspector):
+        callback_name = str(method_inspector.callback)
+        if callback_name not in self.view_docs_parsers:
+            doc_parser = method_inspector.create_docs_parser()
+            self.view_docs_parsers[callback_name] = doc_parser
+        return self.view_docs_parsers[callback_name]
+
     def _get_method_serializer(self, method_inspector):
         """
         Returns serializer used in method.
@@ -179,7 +186,7 @@ class DocumentationGenerator(object):
         Serializer might be ignored if explicitly told in docstring
         """
         serializer = method_inspector.get_response_serializer_class()
-        doc_parser = method_inspector.get_yaml_parser()
+        doc_parser = self.get_docs_parser(method_inspector)
 
         if doc_parser.get_response_type() is not None:
             # Custom response class detected
