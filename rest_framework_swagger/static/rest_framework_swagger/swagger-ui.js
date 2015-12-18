@@ -1,5 +1,8 @@
 $(function() {
 
+    console.log('awesome');
+    console.log('awesome too');
+
 	// Helper function for vertically aligning DOM elements
 	// http://www.seodenver.com/simple-vertical-align-plugin-for-jquery/
 	$.fn.vAlign = function() {
@@ -79,121 +82,14 @@ if (Function.prototype.bind && console && typeof console.log == "object") {
     }, Function.prototype.call);
 }
 
-var Docs = {
-
-	shebang: function() {
-
-		// If shebang has an operation nickname in it..
-		// e.g. /docs/#!/words/get_search
-		var fragments = $.param.fragment().split('/');
-		fragments.shift(); // get rid of the bang
-
-		switch (fragments.length) {
-			case 1:
-				// Expand all operations for the resource and scroll to it
-				log('shebang resource:' + fragments[0]);
-				var dom_id = 'resource_' + fragments[0];
-
-				Docs.expandEndpointListForResource(fragments[0]);
-				$("#"+dom_id).slideto({highlight: false});
-				break;
-			case 2:
-				// Refer to the endpoint DOM element, e.g. #words_get_search
-				log('shebang endpoint: ' + fragments.join('_'));
-
-        // Expand Resource
-        Docs.expandEndpointListForResource(fragments[0]);
-        $("#"+dom_id).slideto({highlight: false});
-
-        // Expand operation
-				var li_dom_id = fragments.join('_');
-				var li_content_dom_id = li_dom_id + "_content";
-
-        log("li_dom_id " + li_dom_id);
-        log("li_content_dom_id " + li_content_dom_id);
-
-				Docs.expandOperation($('#'+li_content_dom_id));
-				$('#'+li_dom_id).slideto({highlight: false});
-				break;
-		}
-
-	},
-
-	toggleEndpointListForResource: function(resource) {
-		var elem = $('li#resource_' + Docs.escapeResourceName(resource) + ' ul.endpoints');
-		if (elem.is(':visible')) {
-			Docs.collapseEndpointListForResource(resource);
-		} else {
-			Docs.expandEndpointListForResource(resource);
-		}
-	},
-
-	// Expand resource
-	expandEndpointListForResource: function(resource) {
-		var resource = Docs.escapeResourceName(resource);
-		if (resource == '') {
-			$('.resource ul.endpoints').slideDown();
-			return;
-		}
-		
-		$('li#resource_' + resource).addClass('active');
-
-		var elem = $('li#resource_' + resource + ' ul.endpoints');
-		elem.slideDown();
-	},
-
-	// Collapse resource and mark as explicitly closed
-	collapseEndpointListForResource: function(resource) {
-		var resource = Docs.escapeResourceName(resource);
-		$('li#resource_' + resource).removeClass('active');
-
-		var elem = $('li#resource_' + resource + ' ul.endpoints');
-		elem.slideUp();
-	},
-
-	expandOperationsForResource: function(resource) {
-		// Make sure the resource container is open..
-		Docs.expandEndpointListForResource(resource);
-		
-		if (resource == '') {
-			$('.resource ul.endpoints li.operation div.content').slideDown();
-			return;
-		}
-
-		$('li#resource_' + Docs.escapeResourceName(resource) + ' li.operation div.content').each(function() {
-			Docs.expandOperation($(this));
-		});
-	},
-
-	collapseOperationsForResource: function(resource) {
-		// Make sure the resource container is open..
-		Docs.expandEndpointListForResource(resource);
-
-		$('li#resource_' + Docs.escapeResourceName(resource) + ' li.operation div.content').each(function() {
-			Docs.collapseOperation($(this));
-		});
-	},
-
-	escapeResourceName: function(resource) {
-		return resource.replace(/[!"#$%&'()*+,.\/:;<=>?@\[\\\]\^`{|}~]/g, "\\$&");
-	},
-
-	expandOperation: function(elem) {
-		elem.slideDown();
-	},
-
-	collapseOperation: function(elem) {
-		elem.slideUp();
-	}
-};(function() {
   var template = Handlebars.template, templates = Handlebars.templates = Handlebars.templates || {};
-templates['content_type'] = template(function (Handlebars,depth0,helpers,partials,data) {
+  templates['content_type'] = template(function (Handlebars,depth0,helpers,partials,data) {
   this.compilerInfo = [4,'>= 1.0.0'];
 helpers = this.merge(helpers, Handlebars.helpers); data = data || {};
   var buffer = "", stack1, functionType="function", self=this;
 
 function program1(depth0,data) {
-  
+
   var buffer = "", stack1;
   buffer += "\n  ";
   stack1 = helpers.each.call(depth0, depth0.produces, {hash:{},inverse:self.noop,fn:self.program(2, program2, data),data:data});
@@ -202,7 +98,7 @@ function program1(depth0,data) {
   return buffer;
   }
 function program2(depth0,data) {
-  
+
   var buffer = "", stack1;
   buffer += "\n	<option value=\"";
   stack1 = (typeof depth0 === functionType ? depth0.apply(depth0) : depth0);
@@ -215,8 +111,8 @@ function program2(depth0,data) {
   }
 
 function program4(depth0,data) {
-  
-  
+
+
   return "\n  <option value=\"application/json\">application/json</option>\n";
   }
 
@@ -226,6 +122,124 @@ function program4(depth0,data) {
   buffer += "\n</select>\n";
   return buffer;
   });
+
+
+var Docs = {
+
+  shebang: function() {
+
+    // If shebang has an operation nickname in it..
+    // e.g. /docs/#!/words/get_search
+    var fragments = $.param.fragment().split('/');
+    fragments.shift(); // get rid of the bang
+
+    switch (fragments.length) {
+      case 1:
+        // Expand all operations for the resource and scroll to it
+        log('shebang resource:' + fragments[0]);
+        var dom_id = 'resource_' + fragments[0];
+
+        Docs.expandEndpointListForResource(fragments[0]);
+        $("#"+dom_id).slideto({highlight: false});
+        break;
+      case 2:
+        // Refer to the endpoint DOM element, e.g. #words_get_search
+        log('shebang endpoint: ' + fragments.join('_'));
+
+        // Expand Resource
+        Docs.expandEndpointListForResource(fragments[0]);
+        $("#"+dom_id).slideto({highlight: false});
+
+        // Expand operation
+        var li_dom_id = fragments.join('_');
+        var li_content_dom_id = li_dom_id + "_content";
+
+        log("li_dom_id " + li_dom_id);
+        log("li_content_dom_id " + li_content_dom_id);
+
+        Docs.expandOperation($('#'+li_content_dom_id));
+        $('#'+li_dom_id).slideto({highlight: false});
+        break;
+    }
+
+  },
+
+  toggleEndpointListForResource: function(resource) {
+    var elem = $('li#resource_' + Docs.escapeResourceName(resource) + ' ul.endpoints');
+    if (elem.is(':visible')) {
+      Docs.collapseEndpointListForResource(resource);
+    } else {
+      Docs.expandEndpointListForResource(resource);
+    }
+  },
+
+  // Expand resource
+  expandEndpointListForResource: function(resource) {
+    var endpointTitle = $('li#resource_' + resource + ' > .heading > h2 > a');
+    endpointTitle.html('fetching '+ resource + '...');
+    Docs.ui.loadResource(
+        resource,
+        onCompelete = function() {
+            endpointTitle.html(resource);
+            resource = Docs.escapeResourceName(resource);
+            if (resource == '') {
+                $('.resource ul.endpoints').slideDown();
+            }
+            else {
+                $('li#resource_' + resource).addClass('active');
+                var elem = $('li#resource_' + resource + ' ul.endpoints');
+                elem.slideDown();
+            }
+        },
+        onError = function() {
+        }
+    );
+  },
+
+  // Collapse resource and mark as explicitly closed
+  collapseEndpointListForResource: function(resource) {
+    var resource = Docs.escapeResourceName(resource);
+    $('li#resource_' + resource).removeClass('active');
+
+    var elem = $('li#resource_' + resource + ' ul.endpoints');
+    elem.slideUp();
+  },
+
+  expandOperationsForResource: function(resource) {
+    // Make sure the resource container is open..
+    Docs.expandEndpointListForResource(resource);
+
+    if (resource == '') {
+      $('.resource ul.endpoints li.operation div.content').slideDown();
+      return;
+    }
+
+    $('li#resource_' + Docs.escapeResourceName(resource) + ' li.operation div.content').each(function() {
+      Docs.expandOperation($(this));
+    });
+  },
+
+  collapseOperationsForResource: function(resource) {
+    // Make sure the resource container is open..
+    Docs.expandEndpointListForResource(resource);
+
+    $('li#resource_' + Docs.escapeResourceName(resource) + ' li.operation div.content').each(function() {
+      Docs.collapseOperation($(this));
+    });
+  },
+
+  escapeResourceName: function(resource) {
+    return resource.replace(/[!"#$%&'()*+,.\/:;<=>?@\[\\\]\^`{|}~]/g, "\\$&");
+  },
+
+  expandOperation: function(elem) {
+    elem.slideDown();
+  },
+
+  collapseOperation: function(elem) {
+    elem.slideUp();
+  }
+};(function() {
 })();
 
 (function() {
@@ -1277,19 +1291,34 @@ helpers = this.merge(helpers, Handlebars.helpers); data = data || {};
       }
       this.options.url = url;
       this.headerView.update(url);
-      this.api = new SwaggerApi(this.options);
-      this.api.build();
+      this.api = new SwaggerApi(this.options)
       return this.api;
     };
 
+
+    SwaggerUi.prototype.loadResource = function(resource_name, onComplete, onError) {
+      var swaggerUi = this;
+      var api = this.api.apis[resource_name];
+      if (!api.is_loaded) {
+        api.getApiResource(
+          successHandler = function () {
+            swaggerUi.directRender(api);
+            onComplete();
+          },
+          errorHandler = function () {
+            onError();
+          }
+        );
+      } else {
+        onComplete();
+      }
+    }
+
     SwaggerUi.prototype.render = function() {
-      var _this = this;
-      this.showMessage('Finished Loading Resource Information. Rendering Swagger UI...');
       this.mainView = new MainView({
         model: this.api,
         el: $('#' + this.dom_id)
       }).render();
-      this.showMessage();
       switch (this.options.docExpansion) {
         case "full":
           Docs.expandOperationsForResource('');
@@ -1300,9 +1329,13 @@ helpers = this.merge(helpers, Handlebars.helpers); data = data || {};
       if (this.options.onComplete) {
         this.options.onComplete(this.api, this);
       }
-      return setTimeout(function() {
-        return Docs.shebang();
-      }, 400);
+      Docs.ui = this;
+      return Docs.shebang();
+    };
+
+    SwaggerUi.prototype.directRender = function(resource) {
+      this.showMessage();
+      this.mainView.updateResource(resource);
     };
 
     SwaggerUi.prototype.buildUrl = function(base, url) {
@@ -1459,6 +1492,16 @@ helpers = this.merge(helpers, Handlebars.helpers); data = data || {};
       });
       return $('#resources').append(resourceView.render().el);
     };
+
+    MainView.prototype.updateResource = function(resource) {
+      var resourceView = new ResourceView({
+        model: resource,
+        tagName: 'li',
+        id: 'resource_' + resource.id,
+        className: 'resource'
+      });
+      return $('#resource_' + resource.id).html(resourceView.render().el);
+    }
 
     MainView.prototype.clear = function() {
       return $(this.el).html('');
