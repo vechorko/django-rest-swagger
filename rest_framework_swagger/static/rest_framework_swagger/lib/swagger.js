@@ -111,7 +111,6 @@ var SwaggerApi = function(url, options) {
 
 SwaggerApi.prototype.build = function() {
   var _this = this;
-  this.progress('fetching resource list: ' + this.url);
   var obj = {
     useJQuery: this.useJQuery,
     url: this.url,
@@ -171,6 +170,7 @@ SwaggerApi.prototype.buildFromSpec = function(response) {
       }
     }
   }
+
   if (response.basePath) {
     this.basePath = response.basePath;
   } else if (this.url.indexOf('?') > 0) {
@@ -178,21 +178,24 @@ SwaggerApi.prototype.buildFromSpec = function(response) {
   } else {
     this.basePath = this.url;
   }
-  if (isApi) {
-    var newName = response.resourcePath.replace(/\//g, '');
-    this.resourcePath = response.resourcePath;
-    res = new SwaggerResource(response, this);
-    this.apis[newName] = res;
-    this.apisArray.push(res);
-  } else {
-    var k;
-    for (k = 0; k < response.apis.length; k++) {
-      var resource = response.apis[k];
-      res = new SwaggerResource(resource, this);
-      this.apis[res.name] = res;
-      this.apisArray.push(res);
+
+    var res;
+    if (isApi) {
+        var newName = response.resourcePath.replace(/\//g, '');
+        this.resourcePath = response.resourcePath;
+        res = new SwaggerResource(response, this);
+        this.apis[newName] = res;
+        this.apisArray.push(res);
+    } else {
+        var k;
+        console.log(response.apis)
+        for (k = 0; k < response.apis.length; k++) {
+            var resource = response.apis[k];
+            res = new SwaggerResource(resource, this);
+            this.apis[res.name] = res;
+            this.apisArray.push(res);
+        }
     }
-  }
   if (this.success) {
     this.success();
   }
@@ -314,9 +317,8 @@ SwaggerApi.prototype.help = function() {
 };
 
 var SwaggerResource = function(resourceObj, api) {
-  var _this = this;
   this.api = api;
-  this.api = this.api;
+  this.is_loaded = false;
   produces = [];
   consumes = [];
   this.path = this.api.resourcePath != null ? this.api.resourcePath : resourceObj.path;
@@ -343,7 +345,11 @@ var SwaggerResource = function(resourceObj, api) {
     } else {
       this.url = this.api.basePath + this.path.replace('{format}', 'json');
     }
-    this.api.progress('fetching resource ' + this.name + ': ' + this.url);
+  }
+}
+
+SwaggerResource.prototype.getApiResource = function(successHandler, errorHandler) {
+    var _this = this;
     obj = {
       url: this.url,
       method: "get",
@@ -353,10 +359,14 @@ var SwaggerResource = function(resourceObj, api) {
       },
       on: {
         response: function(resp) {
-          var responseObj = resp.obj || JSON.parse(resp.data);
-          return _this.addApiDeclaration(responseObj);
+            _this.is_loaded = true
+            var responseObj = resp.obj || JSON.parse(resp.data);
+            var apiDeclaration = _this.addApiDeclaration(responseObj);
+            successHandler();
+            return apiDeclaration;
         },
         error: function(response) {
+          errorHandler();
           return _this.api.fail("Unable to read api '" +
             _this.name + "' from path " + _this.url + " (server returned " + response.statusText + ")");
         }
@@ -365,7 +375,6 @@ var SwaggerResource = function(resourceObj, api) {
     var e = typeof window !== 'undefined' ? window : exports;
     e.authorizations.apply(obj);
     new SwaggerHttp().execute(obj);
-  }
 }
 
 SwaggerResource.prototype.getAbsoluteBasePath = function(relativeBasePath) {

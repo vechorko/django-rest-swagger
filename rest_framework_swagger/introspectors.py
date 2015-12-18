@@ -184,16 +184,27 @@ class BaseMethodIntrospector(object):
         'boolean': ['boolean'],
     }
 
+    def get_module(self):
+        return self.callback.__module__
+
     def __init__(self, view_introspector, method):
         self.method = method
         self.parent = view_introspector
         self.callback = view_introspector.callback
         self.user = view_introspector.user
         self.path = view_introspector.path
-        self.parser = self.get_yaml_parser()
+        self.parser = view_introspector.docgenerator.get_docs_parser(self)
 
-    def get_module(self):
-        return self.callback.__module__
+    def create_docs_parser(self):
+        parser = YAMLDocstringParser(self)
+        parent_parser = YAMLDocstringParser(self.parent)
+        self.parent.get_inherited_docs(parent_parser.object.get('inherit_docs_from', None))
+        self.check_yaml_methods(parent_parser.object.keys())
+        new_object = {}
+        new_object.update(parent_parser.object.get(self.method, {}))
+        new_object.update(parser.object)
+        parser.object.update(new_object)
+        return parser
 
     def check_yaml_methods(self, yaml_methods):
         missing_set = set()
@@ -204,18 +215,6 @@ class BaseMethodIntrospector(object):
             raise Exception(
                 "methods %s in class docstring are not in view methods %s"
                 % (list(missing_set), list(self.parent.methods())))
-
-    def get_yaml_parser(self):
-        parser = YAMLDocstringParser(self)
-        parent_parser = YAMLDocstringParser(self.parent)
-        self.parent.get_inherited_docs(parent_parser.object.get('inherit_docs_from', None))
-        self.check_yaml_methods(parent_parser.object.keys())
-        new_object = {}
-        new_object.update(parent_parser.object.get(self.method, {}))
-        new_object.update(parser.object)
-
-        parser.object.update(new_object)
-        return parser
 
     def get_extra_serializer_classes(self):
         return self.parser.get_extra_serializer_classes(
@@ -612,7 +611,8 @@ class ViewSetIntrospector(BaseViewIntrospector):
     def __iter__(self):
         methods = self._resolve_methods()
         for method in methods:
-            yield ViewSetMethodIntrospector(self, methods[method], method)
+            method_introspector = ViewSetMethodIntrospector(self, methods[method], method)
+            yield method_introspector
 
     def methods(self):
         stuff = []
@@ -891,8 +891,7 @@ class YAMLDocstringParser(object):
 
     def __init__(self, method_introspector):
         self.method_introspector = method_introspector
-        self.object = self.load_obj_from_docstring(
-            docstring=self.method_introspector.get_docs())
+        self.object = self.load_obj_from_docstring(docstring=self.method_introspector.get_docs())
         if self.object is None:
             self.object = {}
 
