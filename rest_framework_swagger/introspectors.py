@@ -888,12 +888,24 @@ class YAMLDocstringParser(object):
     """
     PARAM_TYPES = ['header', 'path', 'form', 'body', 'query']
     yaml_error = None
+    objects = {}
 
     def __init__(self, method_introspector):
         self.method_introspector = method_introspector
-        self.object = self.load_obj_from_docstring(docstring=self.method_introspector.get_docs())
+
+        self.object = self.get_object()
+
         if self.object is None:
             self.object = {}
+
+    def get_object(self):
+        method_name = str(getattr(self.method_introspector, 'method', ""))
+        view_name = str(self.method_introspector.callback)
+        method_path = view_name + method_name
+        if method_path not in self.objects:
+            obj = self.load_obj_from_docstring(docstring=self.method_introspector.get_docs())
+            self.objects[method_path] = obj
+        return self.objects[method_path]
 
     def load_obj_from_docstring(self, docstring):
         """Loads YAML from docstring"""
