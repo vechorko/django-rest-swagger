@@ -172,11 +172,7 @@ class DocumentationGenerator(object):
         return models
 
     def get_docs_parser(self, method_inspector):
-        callback_name = str(method_inspector.callback)
-        if callback_name not in self.view_docs_parsers:
-            doc_parser = method_inspector.create_docs_parser()
-            self.view_docs_parsers[callback_name] = doc_parser
-        return self.view_docs_parsers[callback_name]
+        return method_inspector.create_docs_parser()
 
     def _get_method_serializer(self, method_inspector):
         """
