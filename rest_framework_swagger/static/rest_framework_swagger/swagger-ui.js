@@ -234,6 +234,24 @@ var Docs = {
 
   expandOperation: function(elem) {
     elem.slideDown();
+
+    var rows = $('tr', elem);
+
+    var textareas = $('.body-textarea', rows);
+    textareas.css('height', '500px');
+    textareas.css('max-height', '800px');
+    textareas.css('min-height', '300px');
+    textareas.css('resize', 'vertical');
+
+    var descriptions = $('.description', rows);
+    descriptions.css('display', 'none');
+
+    var snippets = $('.snippet', rows);
+    snippets.css('display', 'block');
+    $('pre', snippets).css('min-height', '456px');
+
+    var descriptionLinks = $('.description-link', rows).parent();
+    descriptionLinks.css('display', 'none')
   },
 
   collapseOperation: function(elem) {
