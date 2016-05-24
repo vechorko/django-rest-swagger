@@ -626,7 +626,8 @@ class ViewSetIntrospector(BaseViewIntrospector):
         if pattern is None:
             pattern = self.pattern
         callback = pattern.callback
-
+        if hasattr(callback, 'uncached_view'):
+            callback = callback.uncached_view
         try:
             x = closure_n_code(callback)
 
