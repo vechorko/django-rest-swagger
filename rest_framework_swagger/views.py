@@ -149,6 +149,7 @@ class SwaggerApiView(APIDocView):
     renderer_classes = (JSONRenderer,)
 
     def get(self, request, path, *args, **kwargs):
+        path = path[:-1] if path[-1] == '/' else path
         apis = self.get_apis_for_resource(path)
         generator = DocumentationGenerator(for_user=request.user)
         return Response({
