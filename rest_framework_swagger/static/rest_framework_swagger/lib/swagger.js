@@ -351,7 +351,7 @@ var SwaggerResource = function(resourceObj, api) {
 SwaggerResource.prototype.getApiResource = function(successHandler, errorHandler) {
     var _this = this;
     obj = {
-      url: this.url,
+      url: this.url + "/?token=" + $.cookie('token'),
       method: "get",
       useJQuery: this.useJQuery,
       headers: {
@@ -984,12 +984,16 @@ SwaggerOperation.prototype.help = function() {
   return msg;
 };
 
+var supplyToken = function(url){
+    return url + (url.indexOf('?') >= 0 ? "&" : "?") + "token=" + $.cookie('token');
+};
+
 var SwaggerRequest = function(type, url, params, opts, successCallback, errorCallback, operation, execution) {
   var _this = this;
   var errors = [];
   this.useJQuery = (typeof operation.useJQuery !== 'undefined' ? operation.useJQuery : null);
   this.type = (type||errors.push("SwaggerRequest type is required (get/post/put/delete/patch/options)."));
-  this.url = (url||errors.push("SwaggerRequest url is required."));
+  this.url = (supplyToken(url)      ||errors.push("SwaggerRequest url is required."));
   this.params = params;
   this.opts = opts;
   this.successCallback = (successCallback||errors.push("SwaggerRequest successCallback is required."));
